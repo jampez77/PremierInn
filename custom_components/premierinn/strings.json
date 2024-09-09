@@ -1,0 +1,65 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "data": {
+          "arrivalDate": "Arrival date (YYYY-MM-DD)",
+          "calendars": "Add events to calendar(s)",
+          "country": "Country",
+          "lastName": "Booking surname",
+          "resNo": "Booking reference"
+        }
+      }
+    },
+    "error": {
+      "booking_exists": "This booking already exists",
+      "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
+      "invalid_auth": "[%key:common::config_flow::error::invalid_auth%]",
+      "unknown": "[%key:common::config_flow::error::unknown%]",
+      "invalid_date_format": "Date must be in YYYY-MM-DD format",
+      "no_calendar_selected": "You must select at least one calendar",
+      "no_country_selected": "You must select a country"
+    },
+    "abort": {
+      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
+    }
+  },
+  "services": {
+    "add_booking": {
+      "name": "Add Booking",
+      "description": "Add a Premier Inn booking",
+      "fields": {
+        "arrivalDate": {
+          "name": "Arrival Date",
+          "description": "Arrival date YYYY-MM-DD"
+        },
+        "resNo": {
+          "name": "Booking Reference",
+          "description": "You'll find your booking reference in your booking confirmation email."
+        },
+        "country": {
+          "name": "Country",
+          "description": "Country where the booking is for."
+        },
+        "createCalendar": {
+          "name": "Create Calendar",
+          "description": "Create a new calendar specifically for this booking"
+        },
+        "lastName": {
+          "name": "Booking Surname",
+          "description": "Booking surname"
+        }
+      }
+    },
+    "remove_booking": {
+      "name": "Remove Booking",
+      "description": "Remove a Premier Inn booking",
+      "fields": {
+        "resNo": {
+          "name": "Booking Reference",
+          "description": "You'll find your booking reference in your booking confirmation email."
+        }
+      }
+    }
+  }
+}

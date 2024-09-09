@@ -1,0 +1,44 @@
+add_booking:
+  description: "Add a booking"
+  target:
+    entity:
+      domain: calendar
+      supported_features:
+        - calendar.CalendarEntityFeature.CREATE_EVENT
+  fields:
+    createCalendar:
+      description: "Create a new calendar"
+      required: true
+      selector:
+        boolean:
+          default: false
+    arrivalDate:
+      description: "Arrival Date (YYYY-MM-DD)"
+      required: true
+      selector:
+        text:
+    lastName:
+      description: "Booking Surname"
+      required: true
+      selector:
+        text:
+    resNo:
+      description: "Booking Reference"
+      required: true
+      selector:
+        text:
+    country:
+      required: true
+      description: "Country where the booking is for"
+      selector:
+        select:
+          options:
+            - Great Britain
+            - Germany
+remove_booking:
+  fields:
+    resNo:
+      description: "Booking Reference"
+      required: true
+      selector:
+        text:

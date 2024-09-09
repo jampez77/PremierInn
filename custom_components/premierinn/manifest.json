@@ -1,0 +1,17 @@
+{
+  "domain": "premierinn",
+  "name": "Premier Inn",
+  "codeowners": [
+    "@jampez77"
+  ],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/jampez77/PremierInn/",
+  "homekit": {},
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/jampez77/PremierInn/issues",
+  "requirements": [],
+  "ssdp": [],
+  "version": "2024.9.1",
+  "zeroconf": []
+}
