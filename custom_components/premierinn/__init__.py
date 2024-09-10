@@ -7,12 +7,14 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from .const import DOMAIN
 from .services import async_setup_services, async_cleanup_services
+import homeassistant.helpers.config_validation as cv
 
 PLATFORMS = [
     Platform.SENSOR,
     Platform.CALENDAR,
     Platform.GEO_LOCATION
 ]
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
