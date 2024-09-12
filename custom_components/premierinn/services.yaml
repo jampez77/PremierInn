@@ -6,23 +6,23 @@ add_booking:
       supported_features:
         - calendar.CalendarEntityFeature.CREATE_EVENT
   fields:
-    createCalendar:
+    create_calendar:
       description: "Create a new calendar"
       required: true
       selector:
         boolean:
           default: false
-    arrivalDate:
+    arrival_date:
       description: "Arrival Date (YYYY-MM-DD)"
       required: true
       selector:
         text:
-    lastName:
+    last_name:
       description: "Booking Surname"
       required: true
       selector:
         text:
-    resNo:
+    res_no:
       description: "Booking Reference"
       required: true
       selector:
@@ -37,7 +37,7 @@ add_booking:
             - Germany
 remove_booking:
   fields:
-    resNo:
+    res_no:
       description: "Booking Reference"
       required: true
       selector:

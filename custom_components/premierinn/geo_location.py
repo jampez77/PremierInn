@@ -9,23 +9,22 @@ from .const import (
     DOMAIN,
     CONF_RES_NO,
     CONF_HOTEL_INFORMATION,
-    CONF_BOOKING_CONFIRMATION
+    CONF_BOOKING_CONFIRMATION,
 )
 from typing import Any
 from bs4 import BeautifulSoup
 from homeassistant.helpers.entity import DeviceInfo
 from .coordinator import PremierInnCoordinator
-from homeassistant.helpers.update_coordinator import (
-    CoordinatorEntity,
-    UpdateFailed
-)
+from homeassistant.helpers.update_coordinator import CoordinatorEntity, UpdateFailed
 from homeassistant.util import dt as dt_util
 from datetime import timedelta
 
 _LOGGER = logging.getLogger(__name__)
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
+async def async_setup_entry(
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+) -> None:
     """Set up the geolocation platform."""
 
     config = hass.data[DOMAIN][entry.entry_id]
@@ -44,7 +43,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     async_add_entities(sensors, update_before_add=True)
 
 
-class PremierInnGeolocationEvent(CoordinatorEntity[PremierInnCoordinator], GeolocationEvent):
+class PremierInnGeolocationEvent(
+    CoordinatorEntity[PremierInnCoordinator], GeolocationEvent
+):
     """Representation of a geolocation entity."""
 
     _attr_should_poll = False
@@ -64,22 +65,22 @@ class PremierInnGeolocationEvent(CoordinatorEntity[PremierInnCoordinator], Geolo
         self.hotel_coordinates = self.hotel_info["coordinates"]
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{name}")},
-            manufacturer='Premier Inn - ' + self.hotel_name,
+            manufacturer="Premier Inn",
+            model=self.hotel_name,
             name=name.upper(),
             configuration_url="https://github.com/jampez77/PremierInn/",
         )
         self._attr_unique_id = f"{DOMAIN}-{self.hotel_name}".lower()
-        self.entity_id = f"geo_location.{DOMAIN}_{self.hotel_name}".lower(
-        )
+        self.entity_id = f"geo_location.{DOMAIN}_{self.hotel_name}".lower()
         self.attrs: dict[str, Any] = {}
-        self._attr_name = 'Premier Inn - ' + self.hotel_name
+        self._attr_name = "Premier Inn - " + self.hotel_name
         self._attr_latitude = self.hotel_coordinates[ATTR_LATITUDE]
         self._attr_longitude = self.hotel_coordinates[ATTR_LONGITUDE]
         self._attr_accuracy = None
         self.formatted_address = [
             value
             for key, value in self.hotel_info["address"].items()
-            if value and value != "None" and value != "" and key != "country"
+            if value and value not in {"None", ""} and key != "country"
         ]
 
     @property
@@ -99,7 +100,7 @@ class PremierInnGeolocationEvent(CoordinatorEntity[PremierInnCoordinator], Geolo
             self._attr_longitude = self.hotel_coordinates["longitude"]
         except Exception as e:
             _LOGGER.error("Error updating geolocation: %s", e)
-            raise UpdateFailed("Failed to update location data")
+            raise UpdateFailed("Failed to update location data") from e
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -108,15 +109,17 @@ class PremierInnGeolocationEvent(CoordinatorEntity[PremierInnCoordinator], Geolo
         formatted_contact = [
             value
             for key, value in self.hotel_info["contactDetails"].items()
-            if value and value != "None" and value != ""
+            if value and value not in {"None", ""}
         ]
 
-        parkingSoup = BeautifulSoup(self.hotel_info.get(
-            "parkingDescription", "Not provided"), "html.parser")
+        parkingSoup = BeautifulSoup(
+            self.hotel_info.get("parkingDescription", "Not provided"), "html.parser"
+        )
         parking = parkingSoup.get_text()
 
-        directionsSoup = BeautifulSoup(self.hotel_info.get(
-            "directions", "Not provided"), "html.parser")
+        directionsSoup = BeautifulSoup(
+            self.hotel_info.get("directions", "Not provided"), "html.parser"
+        )
         directions = directionsSoup.get_text()
 
         return {

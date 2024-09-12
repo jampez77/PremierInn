@@ -2,12 +2,15 @@
 
 DOMAIN = "premierinn"
 HOST = "https://api.premierinn.com/graphql"
-CONF_ARRIVAL_DATE = "arrivalDate"
-CONF_LAST_NAME = "lastName"
-CONF_RES_NO = "resNo"
+CONF_ARRIVAL_DATE = "arrival_date"
+CONF_ARRIVALDATE = "arrivalDate"
+CONF_LAST_NAME = "last_name"
+CONF_LASTNAME = "lastName"
+CONF_RES_NO = "res_no"
+CONF_RESNO = "resNo"
 CONF_VARIABLES = "variables"
 CONF_CALENDARS = "calendars"
-CONF_CREATE_CALENDAR = "createCalendar"
+CONF_CREATE_CALENDAR = "create_calendar"
 CONF_COUNTRY = "country"
 CONF_GERMANY = "Germany"
 CONF_GREAT_BRITAIN = "Great Britain"
@@ -29,7 +32,7 @@ REQUEST_HEADER = {
     "Connection": "keep-alive",
     "Content-Type": "application/json",
     "Accept-Language": "en-GB,en;q=0.9,en-US;q=0.8",
-    "Cookie": "_abck="
+    "Cookie": "_abck=",
 }
 
 FIND_BOOKING_POST_BODY = {
@@ -40,9 +43,9 @@ FIND_BOOKING_POST_BODY = {
             "lastName": "{lastName}",
             "resNo": "{resNo}",
             "country": "{country}",
-            "language": "en"
+            "language": "en",
         }
-    }
+    },
 }
 
 BOOKING_CONF_POST_BODY = {
@@ -51,17 +54,13 @@ BOOKING_CONF_POST_BODY = {
         "basketReference": "{basketReference}",
         "language": "en",
         "country": "{country}",
-        "bookingChannel": "PI"
+        "bookingChannel": "PI",
     },
-    "operationName": "bookingConfirmation"
+    "operationName": "bookingConfirmation",
 }
 
 HOTEL_INFORMATION_POST_BODY = {
     "query": "\n  query GetHotelInformation($hotelId: String!, $country: String!, $language: String!) {\n    hotelInformation(hotelId: $hotelId, country: $country, language: $language) {\n      address {\n        addressLine1\n        addressLine2\n        addressLine3\n        addressLine4\n        postalCode\n        country\n      }\n      hotelId\n      hotelOpeningDate\n      name\n      brand\n      parkingDescription\n      directions\n      county\n      contactDetails {\n        phone\n        hotelNationalPhone\n        email\n      }\n      coordinates {\n        latitude\n        longitude\n      }\n      importantInfo {\n        title\n        infoItems {\n          text\n          priority\n          startDate\n          endDate\n        }\n      }\n    }\n  }\n",
-    CONF_VARIABLES: {
-        "hotelId": "{hotelId}",
-        "language": "en",
-        "country": "{country}"
-    },
-    "operationName": "GetHotelInformation"
+    CONF_VARIABLES: {"hotelId": "{hotelId}", "language": "en", "country": "{country}"},
+    "operationName": "GetHotelInformation",
 }

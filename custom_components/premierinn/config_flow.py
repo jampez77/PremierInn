@@ -1,4 +1,5 @@
 """Config flow for Premier Inn integration."""
+
 from __future__ import annotations
 
 import logging
@@ -23,9 +24,8 @@ from .const import (
     CONF_CALENDARS,
     CONF_COUNTRY,
     CONF_GERMANY,
-    CONF_GREAT_BRITAIN
+    CONF_GREAT_BRITAIN,
 )
-DATE_REGEX = r"\d{4}-\d{2}-\d{2}"
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -39,9 +39,12 @@ async def _get_calendar_entities(hass: HomeAssistant) -> list[str]:
             calendar_entity = hass.states.get(entity_id)
             if calendar_entity:
                 supported_features = calendar_entity.attributes.get(
-                    'supported_features', 0)
+                    "supported_features", 0
+                )
 
-                supports_create_event = supported_features & CalendarEntityFeature.CREATE_EVENT
+                supports_create_event = (
+                    supported_features & CalendarEntityFeature.CREATE_EVENT
+                )
 
                 if supports_create_event:
                     calendar_name = entity.original_name or entity_id
@@ -52,11 +55,20 @@ async def _get_calendar_entities(hass: HomeAssistant) -> list[str]:
 
 
 def is_date_valid_format(value: str) -> bool:
+    """Validate date input."""
+
     try:
         datetime.strptime(value, "%Y-%m-%d")
-        return True
     except ValueError:
         return False
+    else:
+        return True
+
+
+@callback
+def async_get_options_flow(config_entry):
+    """PremierInn flow handler."""
+    return PremierInnFlowHandler(config_entry)
 
 
 async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
@@ -72,11 +84,6 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
         raise InvalidAuth
 
     return {"title": str(data[CONF_RES_NO]).upper()}
-
-
-@callback
-def async_get_options_flow(config_entry):
-    return PremierInnFlowHandler(config_entry)
 
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -96,19 +103,31 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         STEP_USER_DATA_SCHEMA = vol.Schema(
             {
-                vol.Required(CONF_ARRIVAL_DATE, default=user_input.get(CONF_ARRIVAL_DATE, "")): cv.string,
-                vol.Required(CONF_LAST_NAME, default=user_input.get(CONF_LAST_NAME, "")): cv.string,
-                vol.Required(CONF_RES_NO, default=user_input.get(CONF_RES_NO, "")): cv.string,
-                vol.Required(CONF_COUNTRY, default=CONF_GREAT_BRITAIN): vol.In([CONF_GREAT_BRITAIN, CONF_GERMANY]),
-                vol.Required(CONF_CALENDARS, default=user_input.get(CONF_CALENDARS, [])): cv.multi_select(calendar_entities),
+                vol.Required(
+                    CONF_ARRIVAL_DATE, default=user_input.get(CONF_ARRIVAL_DATE, "")
+                ): cv.string,
+                vol.Required(
+                    CONF_LAST_NAME, default=user_input.get(CONF_LAST_NAME, "")
+                ): cv.string,
+                vol.Required(
+                    CONF_RES_NO, default=user_input.get(CONF_RES_NO, "")
+                ): cv.string,
+                vol.Required(CONF_COUNTRY, default=CONF_GREAT_BRITAIN): vol.In(
+                    [CONF_GREAT_BRITAIN, CONF_GERMANY]
+                ),
+                vol.Required(
+                    CONF_CALENDARS, default=user_input.get(CONF_CALENDARS, [])
+                ): cv.multi_select(calendar_entities),
             }
         )
 
         if user_input:
-
             entries = self.hass.config_entries.async_entries(DOMAIN)
 
-            if any(entry.data.get(CONF_RES_NO) == user_input.get(CONF_RES_NO) for entry in entries):
+            if any(
+                entry.data.get(CONF_RES_NO) == user_input.get(CONF_RES_NO)
+                for entry in entries
+            ):
                 errors["base"] = "booking_exists"
 
             if not user_input.get(CONF_CALENDARS):
@@ -151,15 +170,21 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     title=import_data[CONF_RES_NO], data=import_data
                 )
             except Exception as e:  # pylint: disable=broad-except
-                _LOGGER.error(f"Failed to import booking: {e}")
+                _LOGGER.error("Failed to import booking: {e}")
                 return self.async_abort(reason="import_failed")
+
+        return self.async_abort(reason="no_import_data")
 
 
 class PremierInnFlowHandler(config_entries.OptionsFlow):
+    """PremierInn flow handler."""
+
     def __init__(self, config_entry) -> None:
+        """Init."""
         self.config_entry = config_entry
 
     async def async_step_init(self, user_input=None) -> FlowResult:
+        """Init."""
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema({}),

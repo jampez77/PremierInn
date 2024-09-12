@@ -3,11 +3,11 @@
     "step": {
       "user": {
         "data": {
-          "arrivalDate": "Arrival date (YYYY-MM-DD)",
+          "arrival_date": "Arrival date (YYYY-MM-DD)",
           "calendars": "Add events to calendar(s)",
           "country": "Country",
-          "lastName": "Booking surname",
-          "resNo": "Booking reference"
+          "last_name": "Booking surname",
+          "res_no": "Booking reference"
         }
       }
     },
@@ -29,11 +29,11 @@
       "name": "Add Booking",
       "description": "Add a Premier Inn booking",
       "fields": {
-        "arrivalDate": {
+        "arrival_date": {
           "name": "Arrival Date",
           "description": "Arrival date YYYY-MM-DD"
         },
-        "resNo": {
+        "res_no": {
           "name": "Booking Reference",
           "description": "You'll find your booking reference in your booking confirmation email."
         },
@@ -41,11 +41,11 @@
           "name": "Country",
           "description": "Country where the booking is for."
         },
-        "createCalendar": {
+        "create_calendar": {
           "name": "Create Calendar",
           "description": "Create a new calendar specifically for this booking"
         },
-        "lastName": {
+        "last_name": {
           "name": "Booking Surname",
           "description": "Booking surname"
         }
@@ -55,7 +55,7 @@
       "name": "Remove Booking",
       "description": "Remove a Premier Inn booking",
       "fields": {
-        "resNo": {
+        "res_no": {
           "name": "Booking Reference",
           "description": "You'll find your booking reference in your booking confirmation email."
         }

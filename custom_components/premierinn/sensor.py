@@ -1,4 +1,5 @@
 """Premier Inn sensor platform."""
+
 from datetime import datetime, date
 from homeassistant.util import dt as dt_util
 import time
@@ -12,7 +13,7 @@ from .const import (
     DOMAIN,
     CONF_RES_NO,
     CONF_BOOKING_CONFIRMATION,
-    CONF_HOTEL_INFORMATION
+    CONF_HOTEL_INFORMATION,
 )
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.entity import DeviceInfo
@@ -30,36 +31,33 @@ from .coordinator import PremierInnCoordinator
 
 SENSOR_TYPES = [
     SensorEntityDescription(
-        key="roomStay",
-        name="Booking",
-        icon="mdi:clipboard-outline"
+        key="roomStay", name="Booking", icon="mdi:clipboard-outline"
     ),
     SensorEntityDescription(
-        key="hotelInformation",
-        name="Hotel Information",
-        icon="mdi:bed"
+        key="hotelInformation", name="Hotel Information", icon="mdi:bed"
     ),
     SensorEntityDescription(
         key="checkInTime",
         name="Check in Time",
         icon="mdi:clock-in",
-        device_class=SensorDeviceClass.TIMESTAMP
+        device_class=SensorDeviceClass.TIMESTAMP,
     ),
     SensorEntityDescription(
         key="checkOutTime",
         name="Check out Time",
         icon="mdi:clock-out",
-        device_class=SensorDeviceClass.TIMESTAMP
+        device_class=SensorDeviceClass.TIMESTAMP,
     ),
 ]
 
 
 def hasBookingExpired(hass: HomeAssistant, expiry_date_raw: str) -> bool:
-    """ Check if booking has expired """
+    """Check if booking has expired."""
     user_timezone = dt_util.get_time_zone(hass.config.time_zone)
 
-    dt_utc = datetime.strptime(
-        expiry_date_raw, '%Y-%m-%dT%H:%M:%S').replace(tzinfo=user_timezone)
+    dt_utc = datetime.strptime(expiry_date_raw, "%Y-%m-%dT%H:%M:%S").replace(
+        tzinfo=user_timezone
+    )
     # Convert the datetime to the default timezone
     expiry_date = dt_utc.astimezone(user_timezone)
 
@@ -67,11 +65,14 @@ def hasBookingExpired(hass: HomeAssistant, expiry_date_raw: str) -> bool:
 
 
 async def removeBooking(hass: HomeAssistant, booking_reference: str):
-    """ Remove expired booking """
+    """Remove expired booking."""
     entry = next(
-        (entry for entry in hass.config_entries.async_entries(DOMAIN)
-            if entry.data.get(CONF_RES_NO) == booking_reference),
-        None
+        (
+            entry
+            for entry in hass.config_entries.async_entries(DOMAIN)
+            if entry.data.get(CONF_RES_NO) == booking_reference
+        ),
+        None,
     )
 
     # Remove the config entry
@@ -83,7 +84,7 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Setup sensors from a config entry created in the integrations UI."""
+    """Set up sensors from a config entry created in the integrations UI."""
     config = hass.data[DOMAIN][entry.entry_id]
 
     if entry.options:
@@ -99,41 +100,19 @@ async def async_setup_entry(
         name = entry.data[CONF_RES_NO]
 
         room_stay = coordinator.data.get(CONF_BOOKING_CONFIRMATION)[
-            "reservationByIdList"][0]["roomStay"]
+            "reservationByIdList"
+        ][0]["roomStay"]
 
         check_out_time = f"{room_stay['departureDate']}T{room_stay['checkOutTime']}:00"
 
         if hasBookingExpired(hass, check_out_time):
             await removeBooking(hass, name)
         else:
-            sensors = [PremierInnSensor(coordinator, name, description)
-                       for description in SENSOR_TYPES]
+            sensors = [
+                PremierInnSensor(coordinator, name, description)
+                for description in SENSOR_TYPES
+            ]
             async_add_entities(sensors, update_before_add=True)
-
-
-async def async_setup_platform(
-    hass: HomeAssistant,
-    config: ConfigType,
-    async_add_entities: AddEntitiesCallback,
-    _: DiscoveryInfoType | None = None,
-) -> None:
-    """Set up the sensor platform."""
-    session = async_get_clientsession(hass)
-    coordinator = PremierInnCoordinator(hass, session, config)
-
-    name = config[CONF_RES_NO]
-
-    room_stay = coordinator.data.get(CONF_BOOKING_CONFIRMATION)[
-        "reservationByIdList"][0]["roomStay"]
-
-    check_out_time = f"{room_stay['departureDate']}T{room_stay['checkOutTime']}:00"
-
-    if hasBookingExpired(hass, check_out_time):
-        await removeBooking(hass, name)
-    else:
-        sensors = [PremierInnSensor(coordinator, name, description)
-                   for description in SENSOR_TYPES]
-        async_add_entities(sensors, update_before_add=True)
 
 
 class PremierInnSensor(CoordinatorEntity[PremierInnCoordinator], SensorEntity):
@@ -150,8 +129,8 @@ class PremierInnSensor(CoordinatorEntity[PremierInnCoordinator], SensorEntity):
         self.data = coordinator.data
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{name}")},
-            manufacturer='Premier Inn - ' +
-            self.data.get(CONF_HOTEL_INFORMATION)["name"],
+            manufacturer="Premier Inn",
+            model=self.data.get(CONF_HOTEL_INFORMATION)["name"],
             name=name.upper(),
             configuration_url="https://github.com/jampez77/PremierInn/",
         )
@@ -167,21 +146,23 @@ class PremierInnSensor(CoordinatorEntity[PremierInnCoordinator], SensorEntity):
 
     @property
     def native_value(self) -> str | date | None:
+        """Native value."""
         value = self.data.get(self.entity_description.key)
 
         if self.entity_description.key == "roomStay":
-            room_stay = self.data.get(CONF_BOOKING_CONFIRMATION)[
-                "reservationByIdList"][0]["roomStay"]
+            room_stay = self.data.get(CONF_BOOKING_CONFIRMATION)["reservationByIdList"][
+                0
+            ]["roomStay"]
 
             value = room_stay["roomExtraInfo"]["roomName"]
 
-        if self.entity_description.key == 'hotelInformation':
+        if self.entity_description.key == "hotelInformation":
             value = self.data.get(CONF_HOTEL_INFORMATION)["name"]
 
         if self.entity_description.device_class == SensorDeviceClass.TIMESTAMP:
-
-            room_stay = self.data.get(CONF_BOOKING_CONFIRMATION)[
-                "reservationByIdList"][0]["roomStay"]
+            room_stay = self.data.get(CONF_BOOKING_CONFIRMATION)["reservationByIdList"][
+                0
+            ]["roomStay"]
 
             if self.entity_description.key == "checkInTime":
                 value = f"{room_stay['arrivalDate']}T{room_stay['checkInTime']}:00"
@@ -190,25 +171,25 @@ class PremierInnSensor(CoordinatorEntity[PremierInnCoordinator], SensorEntity):
 
             user_timezone = dt_util.get_time_zone(self.hass.config.time_zone)
 
-            dt_utc = datetime.strptime(
-                value, '%Y-%m-%dT%H:%M:%S').replace(tzinfo=user_timezone)
+            dt_utc = datetime.strptime(value, "%Y-%m-%dT%H:%M:%S").replace(
+                tzinfo=user_timezone
+            )
             # Convert the datetime to the default timezone
             value = dt_utc.astimezone(user_timezone)
         return value
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-
+        """Define entity attributes."""
         if self.entity_description.key == "roomStay":
             value = self.data.get(CONF_BOOKING_CONFIRMATION)
         else:
             value = self.data.get(self.entity_description.key)
-        if isinstance(value, dict) or isinstance(value, list):
+        if isinstance(value, (dict, list)):
             for index, attribute in enumerate(value):
-                if isinstance(attribute, list) or isinstance(attribute, dict):
+                if isinstance(attribute, (dict, list)):
                     for attr in attribute:
-                        self.attrs[str(attr) + str(index)
-                                   ] = attribute[attr]
+                        self.attrs[str(attr) + str(index)] = attribute[attr]
                 else:
                     self.attrs[attribute] = value[attribute]
 
