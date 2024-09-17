@@ -13,9 +13,9 @@ from homeassistant.components.calendar import CalendarEntityFeature
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 import homeassistant.helpers.config_validation as cv
-from homeassistant.helpers.entity_registry import EntityRegistry as er
 
 from .const import (
     CONF_ARRIVAL_DATE,
