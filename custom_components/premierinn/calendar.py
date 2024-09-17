@@ -1,34 +1,29 @@
 """Premier Inn sensor platform."""
 
 from datetime import datetime
-from homeassistant.core import HomeAssistant, ServiceCall
-from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
-from homeassistant.exceptions import ServiceValidationError, HomeAssistantError
-from .const import (
-    DOMAIN,
-    CONF_RES_NO,
-    CONF_CALENDARS,
-    CONF_HOTEL_INFORMATION,
-    CONF_BOOKING_CONFIRMATION,
-)
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.entity import DeviceInfo
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.components.calendar import CalendarEntity, CalendarEvent
-from homeassistant.helpers.update_coordinator import (
-    CoordinatorEntity,
-)
-import uuid
 import hashlib
 import json
-from .coordinator import PremierInnCoordinator
+import uuid
+
+from homeassistant.components.calendar import CalendarEntity, CalendarEvent
+from homeassistant.components.sensor import SensorEntityDescription
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
-from homeassistant.components.sensor import (
-    SensorEntity,
-    SensorEntityDescription,
-    SensorDeviceClass,
+
+from .const import (
+    CONF_BOOKING_CONFIRMATION,
+    CONF_CALENDARS,
+    CONF_HOTEL_INFORMATION,
+    CONF_RES_NO,
+    DOMAIN,
 )
+from .coordinator import PremierInnCoordinator
 
 DATE_SENSOR_TYPES = [
     SensorEntityDescription(

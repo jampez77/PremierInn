@@ -1,23 +1,26 @@
+"""Premier Inn Geo location platform."""
+
 import logging
+from typing import Any
+
+from bs4 import BeautifulSoup
+
 from homeassistant.components.geo_location import GeolocationEvent
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_LATITUDE, ATTR_LONGITUDE
 from homeassistant.core import HomeAssistant
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from .const import (
-    DOMAIN,
-    CONF_RES_NO,
-    CONF_HOTEL_INFORMATION,
-    CONF_BOOKING_CONFIRMATION,
-)
-from typing import Any
-from bs4 import BeautifulSoup
 from homeassistant.helpers.entity import DeviceInfo
-from .coordinator import PremierInnCoordinator
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity, UpdateFailed
-from homeassistant.util import dt as dt_util
-from datetime import timedelta
+
+from .const import (
+    CONF_BOOKING_CONFIRMATION,
+    CONF_HOTEL_INFORMATION,
+    CONF_RES_NO,
+    DOMAIN,
+)
+from .coordinator import PremierInnCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 

@@ -1,29 +1,33 @@
-from homeassistant.core import HomeAssistant, ServiceCall
-import voluptuous as vol
-from homeassistant.helpers import config_validation as cv
-from .const import (
-    DOMAIN,
-    CONF_RES_NO,
-    CONF_ARRIVAL_DATE,
-    CONF_CALENDARS,
-    CONF_ADD_BOOKING,
-    CONF_REMOVE_BOOKING,
-    CONF_LAST_NAME,
-    CONF_GREAT_BRITAIN,
-    CONF_GERMANY,
-    CONF_COUNTRY,
-    CONF_DE,
-    CONF_GB,
-    CONF_CREATE_CALENDAR,
-)
-from homeassistant.const import CONF_ENTITY_ID
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.device_registry import async_get as async_get_device_registry
-from homeassistant.helpers.entity_registry import async_get as async_get_entity_registry
-from .coordinator import PremierInnCoordinator
+"""Premier Inn services platform."""
+
+from datetime import datetime
 import functools
 
+import voluptuous as vol
+
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import CONF_ENTITY_ID
+from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
+
+from .const import (
+    CONF_ADD_BOOKING,
+    CONF_ARRIVAL_DATE,
+    CONF_CALENDARS,
+    CONF_COUNTRY,
+    CONF_CREATE_CALENDAR,
+    CONF_DE,
+    CONF_GB,
+    CONF_GERMANY,
+    CONF_GREAT_BRITAIN,
+    CONF_LAST_NAME,
+    CONF_REMOVE_BOOKING,
+    CONF_RES_NO,
+    DOMAIN,
+)
+from .coordinator import PremierInnCoordinator
 
 # Define the schema for your service
 SERVICE_ADD_BOOKING_SCHEMA = vol.Schema(
@@ -102,6 +106,17 @@ def get_country(data: dict) -> str:
     return CONF_GB
 
 
+def is_date_valid_format(value: str) -> bool:
+    """Validate date input."""
+
+    try:
+        datetime.strptime(value, "%Y-%m-%d")
+    except ValueError:
+        return False
+    else:
+        return True
+
+
 async def add_booking(hass: HomeAssistant, call: ServiceCall) -> None:
     """Add a Premier Inn booking."""
     booking_reference = call.data.get(CONF_RES_NO)
@@ -123,8 +138,11 @@ async def add_booking(hass: HomeAssistant, call: ServiceCall) -> None:
 
     entries = hass.config_entries.async_entries(DOMAIN)
 
+    if not is_date_valid_format(arrival_date):
+        raise HomeAssistantError("Date must be in YYYY-MM-DD format.")
+
     if any(entry.data.get(CONF_RES_NO) == booking_reference for entry in entries):
-        return
+        raise HomeAssistantError(f"Booking {booking_reference} already exists.")
 
     # Initiate the config flow with the "import" step
     await hass.config_entries.flow.async_init(
@@ -137,12 +155,6 @@ async def add_booking(hass: HomeAssistant, call: ServiceCall) -> None:
             CONF_COUNTRY: country,
             CONF_CALENDARS: calendar_entities,
         },
-    )
-
-    # Notify user
-    hass.components.persistent_notification.create(
-        f"Added Premier Inn booking {booking_reference}",
-        title="Premier Inn Booking Added",
     )
 
 

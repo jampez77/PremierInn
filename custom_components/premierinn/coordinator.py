@@ -43,7 +43,9 @@ _LOGGER = logging.getLogger(__name__)
 
 def get_country(data: dict) -> str:
     """Get country."""
-    if CONF_COUNTRY in data and data[CONF_COUNTRY] == CONF_GERMANY:
+    if CONF_COUNTRY in data and (
+        data[CONF_COUNTRY] == CONF_GERMANY or data[CONF_COUNTRY] == CONF_DE
+    ):
         return CONF_DE
     return CONF_GB
 
@@ -72,12 +74,6 @@ class PremierInnCoordinator(DataUpdateCoordinator):
 
     async def _async_update_data(self):
         """Fetch data from API endpoint."""
-
-        def handle_status_code(status_code):
-            if status_code == 401:
-                raise InvalidAuth("Invalid authentication credentials")
-            if status_code == 429:
-                raise APIRatelimitExceeded("API rate limit exceeded.")
 
         def validate_response(body):
             if not isinstance(body, dict):

@@ -1,31 +1,26 @@
 """Premier Inn sensor platform."""
 
-from datetime import datetime, date
-from homeassistant.util import dt as dt_util
-import time
-import pytz
-from homeassistant.util.dt import DEFAULT_TIME_ZONE
-from homeassistant.core import HomeAssistant
+from datetime import date, datetime
 from typing import Any
-from homeassistant.const import UnitOfMass
-from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
-from .const import (
-    DOMAIN,
-    CONF_RES_NO,
-    CONF_BOOKING_CONFIRMATION,
-    CONF_HOTEL_INFORMATION,
-)
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.entity import DeviceInfo
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.config_entries import ConfigEntry
+
 from homeassistant.components.sensor import (
+    SensorDeviceClass,
     SensorEntity,
     SensorEntityDescription,
-    SensorDeviceClass,
 )
-from homeassistant.helpers.update_coordinator import (
-    CoordinatorEntity,
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import dt as dt_util
+
+from .const import (
+    CONF_BOOKING_CONFIRMATION,
+    CONF_HOTEL_INFORMATION,
+    CONF_RES_NO,
+    DOMAIN,
 )
 from .coordinator import PremierInnCoordinator
 

@@ -7,11 +7,12 @@ add_booking:
         - calendar.CalendarEntityFeature.CREATE_EVENT
   fields:
     create_calendar:
-      description: "Create a new calendar"
+      name: Create Calendar
+      description: "Whether to create a calendar for this booking"
       required: true
       selector:
-        boolean:
-          default: false
+        boolean: {}
+      default: false
     arrival_date:
       description: "Arrival Date (YYYY-MM-DD)"
       required: true
