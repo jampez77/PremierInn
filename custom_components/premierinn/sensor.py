@@ -9,7 +9,7 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -133,6 +133,83 @@ class PremierInnSensor(CoordinatorEntity[PremierInnCoordinator], SensorEntity):
         self.entity_id = f"sensor.{DOMAIN}_{name}_{description.key}".lower()
         self.attrs: dict[str, Any] = {}
         self.entity_description = description
+        self.name = name
+        self._state = None
+
+    def update_from_coordinator(self):
+        """Update sensor state and attributes from coordinator data."""
+        room_stay = self.data.get(CONF_BOOKING_CONFIRMATION)["reservationByIdList"][0][
+            "roomStay"
+        ]
+
+        check_out_time = f"{room_stay['departureDate']}T{room_stay['checkOutTime']}:00"
+
+        if hasBookingExpired(self.hass, check_out_time):
+            self.hass.async_add_job(removeBooking(self.hass, self.name))
+        else:
+            value = self.data.get(self.entity_description.key)
+
+            if self.entity_description.key == "roomStay":
+                room_stay = self.data.get(CONF_BOOKING_CONFIRMATION)[
+                    "reservationByIdList"
+                ][0]["roomStay"]
+
+                value = room_stay["roomExtraInfo"]["roomName"]
+
+            if self.entity_description.key == "hotelInformation":
+                value = self.data.get(CONF_HOTEL_INFORMATION)["name"]
+
+            if self.entity_description.device_class == SensorDeviceClass.TIMESTAMP:
+                room_stay = self.data.get(CONF_BOOKING_CONFIRMATION)[
+                    "reservationByIdList"
+                ][0]["roomStay"]
+
+                if self.entity_description.key == "checkInTime":
+                    value = f"{room_stay['arrivalDate']}T{room_stay['checkInTime']}:00"
+                elif self.entity_description.key == "checkOutTime":
+                    value = (
+                        f"{room_stay['departureDate']}T{room_stay['checkOutTime']}:00"
+                    )
+
+                user_timezone = dt_util.get_time_zone(self.hass.config.time_zone)
+
+                dt_utc = datetime.strptime(value, "%Y-%m-%dT%H:%M:%S").replace(
+                    tzinfo=user_timezone
+                )
+                # Convert the datetime to the default timezone
+                value = dt_utc.astimezone(user_timezone)
+
+            self._state = value
+
+            if self.entity_description.key == "roomStay":
+                value = self.data.get(CONF_BOOKING_CONFIRMATION)
+            else:
+                value = self.data.get(self.entity_description.key)
+
+            if isinstance(value, (dict, list)):
+                for index, attribute in enumerate(value):
+                    if isinstance(attribute, (dict, list)):
+                        for attr in attribute:
+                            self.attrs[str(attr) + str(index)] = attribute[attr]
+                    else:
+                        self.attrs[attribute] = value[attribute]
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        self.update_from_coordinator()
+        self.async_write_ha_state()
+
+    async def async_added_to_hass(self) -> None:
+        """Handle adding to Home Assistant."""
+        await super().async_added_to_hass()
+        await self.async_update()
+
+    async def async_remove(self) -> None:
+        """Handle the removal of the entity."""
+        # If you have any specific cleanup logic, add it here
+        if self.hass is not None:
+            await super().async_remove()
 
     @property
     def available(self) -> bool:
@@ -142,50 +219,9 @@ class PremierInnSensor(CoordinatorEntity[PremierInnCoordinator], SensorEntity):
     @property
     def native_value(self) -> str | date | None:
         """Native value."""
-        value = self.data.get(self.entity_description.key)
-
-        if self.entity_description.key == "roomStay":
-            room_stay = self.data.get(CONF_BOOKING_CONFIRMATION)["reservationByIdList"][
-                0
-            ]["roomStay"]
-
-            value = room_stay["roomExtraInfo"]["roomName"]
-
-        if self.entity_description.key == "hotelInformation":
-            value = self.data.get(CONF_HOTEL_INFORMATION)["name"]
-
-        if self.entity_description.device_class == SensorDeviceClass.TIMESTAMP:
-            room_stay = self.data.get(CONF_BOOKING_CONFIRMATION)["reservationByIdList"][
-                0
-            ]["roomStay"]
-
-            if self.entity_description.key == "checkInTime":
-                value = f"{room_stay['arrivalDate']}T{room_stay['checkInTime']}:00"
-            elif self.entity_description.key == "checkOutTime":
-                value = f"{room_stay['departureDate']}T{room_stay['checkOutTime']}:00"
-
-            user_timezone = dt_util.get_time_zone(self.hass.config.time_zone)
-
-            dt_utc = datetime.strptime(value, "%Y-%m-%dT%H:%M:%S").replace(
-                tzinfo=user_timezone
-            )
-            # Convert the datetime to the default timezone
-            value = dt_utc.astimezone(user_timezone)
-        return value
+        return self._state
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Define entity attributes."""
-        if self.entity_description.key == "roomStay":
-            value = self.data.get(CONF_BOOKING_CONFIRMATION)
-        else:
-            value = self.data.get(self.entity_description.key)
-        if isinstance(value, (dict, list)):
-            for index, attribute in enumerate(value):
-                if isinstance(attribute, (dict, list)):
-                    for attr in attribute:
-                        self.attrs[str(attr) + str(index)] = attribute[attr]
-                else:
-                    self.attrs[attribute] = value[attribute]
-
         return self.attrs
