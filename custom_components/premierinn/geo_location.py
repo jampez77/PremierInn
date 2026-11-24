@@ -1,5 +1,7 @@
 """Premier Inn Geo location platform."""
 
+from __future__ import annotations
+
 import logging
 from typing import Any
 
@@ -7,8 +9,9 @@ from bs4 import BeautifulSoup
 
 from homeassistant.components.geo_location import GeolocationEvent
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import ATTR_LATITUDE, ATTR_LONGITUDE
+from homeassistant.const import ATTR_LATITUDE, ATTR_LONGITUDE, Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -16,6 +19,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity, UpdateFa
 
 from .const import (
     CONF_BOOKING_CONFIRMATION,
+    CONF_HOTEL_ID,
     CONF_HOTEL_INFORMATION,
     CONF_RES_NO,
     DOMAIN,
@@ -42,8 +46,34 @@ async def async_setup_entry(
 
     name = entry.data[CONF_RES_NO]
 
-    sensors = [PremierInnGeolocationEvent(coordinator, name)]
-    async_add_entities(sensors, update_before_add=True)
+    location = PremierInnGeolocationEvent(coordinator, name)
+    _migrate_location_unique_id(hass, entry, location)
+    async_add_entities([location], update_before_add=True)
+
+
+def _migrate_location_unique_id(
+    hass: HomeAssistant, entry: ConfigEntry, location: PremierInnGeolocationEvent
+) -> None:
+    """Reuse the existing registry entry when its hotel can be identified."""
+    registry = er.async_get(hass)
+    if registry.async_get_entity_id(Platform.GEO_LOCATION, DOMAIN, location.unique_id):
+        return
+
+    legacy_entries = {
+        entity.unique_id: entity
+        for entity in er.async_entries_for_config_entry(registry, entry.entry_id)
+        if entity.domain == Platform.GEO_LOCATION
+        and entity.platform == DOMAIN
+        and entity.unique_id.startswith(f"{DOMAIN}-")
+    }
+    legacy_entry = legacy_entries.get(f"{DOMAIN}-{location.hotel_name}".lower())
+    # A renamed hotel can leave a single legacy row for this booking.
+    if legacy_entry is None and len(legacy_entries) == 1:
+        legacy_entry = next(iter(legacy_entries.values()))
+    if legacy_entry is not None:
+        registry.async_update_entity(
+            legacy_entry.entity_id, new_unique_id=location.unique_id
+        )
 
 
 class PremierInnGeolocationEvent(
@@ -73,7 +103,7 @@ class PremierInnGeolocationEvent(
             name=name.upper(),
             configuration_url="https://github.com/jampez77/PremierInn/",
         )
-        self._attr_unique_id = f"{DOMAIN}-{self.hotel_name}".lower()
+        self._attr_unique_id = f"hotel:{self.booking_confirmation[CONF_HOTEL_ID]}"
         self.entity_id = f"geo_location.{DOMAIN}_{self.hotel_name}".lower()
         self.attrs: dict[str, Any] = {}
         self._attr_name = "Premier Inn - " + self.hotel_name

@@ -28,6 +28,7 @@ from .const import (
     DOMAIN,
 )
 from .coordinator import PremierInnCoordinator
+from .services import booking_exists
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -124,12 +125,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
         if user_input:
-            entries = self.hass.config_entries.async_entries(DOMAIN)
-
-            if any(
-                entry.data.get(CONF_RES_NO) == user_input.get(CONF_RES_NO)
-                for entry in entries
-            ):
+            booking_id = user_input[CONF_RES_NO].strip().lower()
+            if booking_exists(self.hass, booking_id):
                 errors["base"] = "booking_exists"
 
             if not user_input.get(CONF_CALENDARS):
@@ -152,6 +149,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     _LOGGER.exception("Unexpected exception")
                     errors["base"] = "unknown"
                 else:
+                    await self.async_set_unique_id(booking_id)
+                    self._abort_if_unique_id_configured()
                     return self.async_create_entry(title=info["title"], data=user_input)
 
         return self.async_show_form(
@@ -162,32 +161,32 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_import(self, import_data=None) -> FlowResult:
         """Handle the import step for the service call."""
+        if import_data is None:
+            return self.async_abort(reason="no_import_data")
 
-        if import_data is not None:
-            try:
-                session = async_get_clientsession(self.hass)
+        try:
+            booking_reference = import_data[CONF_RES_NO]
+            booking_id = booking_reference.strip().lower()
+            if booking_exists(self.hass, booking_id):
+                return self.async_abort(reason="already_configured")
 
-                coordinator = PremierInnCoordinator(self.hass, session, import_data)
+            session = async_get_clientsession(self.hass)
+            coordinator = PremierInnCoordinator(self.hass, session, import_data)
+            await coordinator.async_refresh()
+        except Exception:  # pylint: disable=broad-except
+            _LOGGER.exception("Failed to import booking")
+            return self.async_abort(reason="import_failed")
 
-                await coordinator.async_refresh()
+        if coordinator.data is None:
+            self.hass.components.persistent_notification.create(
+                f"Premier Inn booking {booking_reference.upper()} not found.",
+                title="Unable to add Premier Inn Booking",
+            )
+            return self.async_abort(reason="no_import_data")
 
-                if coordinator.data is not None:
-                    await self.async_set_unique_id(import_data[CONF_RES_NO])
-                    self._abort_if_unique_id_configured()
-
-                    return self.async_create_entry(
-                        title=import_data[CONF_RES_NO], data=import_data
-                    )
-
-                self.hass.components.persistent_notification.create(
-                    f"Premier Inn booking {import_data[CONF_RES_NO].upper()} not found.",
-                    title="Unable to add Premier Inn Booking",
-                )
-            except Exception as e:  # pylint: disable=broad-except
-                _LOGGER.error("Failed to import booking: {e}")
-                return self.async_abort(reason="import_failed")
-
-        return self.async_abort(reason="no_import_data")
+        await self.async_set_unique_id(booking_id)
+        self._abort_if_unique_id_configured()
+        return self.async_create_entry(title=booking_reference, data=import_data)
 
 
 class PremierInnFlowHandler(config_entries.OptionsFlow):

@@ -6,9 +6,8 @@ import asyncio
 
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.core import HomeAssistant
 import homeassistant.helpers.config_validation as cv
-from homeassistant.helpers.typing import ConfigType
 
 from .const import DOMAIN
 from .services import async_cleanup_services, async_setup_services
@@ -26,28 +25,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if not hass.data[DOMAIN]:
         async_setup_services(hass)
 
-    # Registers update listener to update config entry when options are updated.
-    unsub_options_update_listener = entry.add_update_listener(options_update_listener)
+    options = entry.options
 
-    # Use async_on_unload to register the listener without storing it in entry data
-    entry.async_on_unload(unsub_options_update_listener)
+    async def reload_on_options_change(
+        hass: HomeAssistant, updated_entry: ConfigEntry
+    ) -> None:
+        if (
+            updated_entry.options != options
+            and updated_entry.state
+            not in (ConfigEntryState.SETUP_IN_PROGRESS, ConfigEntryState.SETUP_RETRY)
+        ):
+            await hass.config_entries.async_reload(updated_entry.entry_id)
+
+    entry.async_on_unload(entry.add_update_listener(reload_on_options_change))
 
     hass.data[DOMAIN][entry.entry_id] = hass_data
     # Forward the setup to each platform.
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
-
-
-async def options_update_listener(hass: HomeAssistant, config_entry: ConfigEntry):
-    """Handle options update."""
-    entry_state = hass.config_entries.async_get_entry(config_entry.entry_id).state
-
-    # Proceed only if the entry is in a valid state (loaded, etc.)
-    if entry_state not in (
-        ConfigEntryState.SETUP_IN_PROGRESS,
-        ConfigEntryState.SETUP_RETRY,
-    ):
-        await hass.config_entries.async_reload(config_entry.entry_id)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -70,15 +65,3 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         async_cleanup_services(hass)
 
     return unload_ok
-
-
-async def handle_get_events(call: ServiceCall) -> None:
-    """Your logic to handle the service call."""
-
-
-async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
-    """Set up the Premier Inn component from yaml configuration."""
-
-    hass.services.async_register("calendar", "get_events", handle_get_events)
-    hass.data.setdefault(DOMAIN, {})
-    return True

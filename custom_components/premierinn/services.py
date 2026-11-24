@@ -117,6 +117,14 @@ def is_date_valid_format(value: str) -> bool:
         return True
 
 
+def booking_exists(hass: HomeAssistant, booking_id: str) -> bool:
+    """Check for a booking, including entries saved without a unique ID."""
+    return any(
+        entry.data.get(CONF_RES_NO, "").strip().lower() == booking_id
+        for entry in hass.config_entries.async_entries(DOMAIN)
+    )
+
+
 async def add_booking(hass: HomeAssistant, call: ServiceCall) -> None:
     """Add a Premier Inn booking."""
     booking_reference = call.data.get(CONF_RES_NO)
@@ -136,12 +144,10 @@ async def add_booking(hass: HomeAssistant, call: ServiceCall) -> None:
         if calendar_entity:
             calendar_entities[calendar] = calendar
 
-    entries = hass.config_entries.async_entries(DOMAIN)
-
     if not is_date_valid_format(arrival_date):
         raise HomeAssistantError("Date must be in YYYY-MM-DD format.")
 
-    if any(entry.data.get(CONF_RES_NO) == booking_reference for entry in entries):
+    if booking_exists(hass, booking_reference.strip().lower()):
         raise HomeAssistantError(f"Booking {booking_reference} already exists.")
 
     # Initiate the config flow with the "import" step

@@ -1,18 +1,23 @@
-"""Premier Inn sensor platform."""
+"""Premier Inn calendar platform."""
 
-from datetime import datetime
+from __future__ import annotations
+
+import asyncio
+from datetime import UTC, datetime
 import hashlib
 import json
+import logging
 import uuid
 
 from homeassistant.components.calendar import CalendarEntity, CalendarEvent
 from homeassistant.components.sensor import SensorEntityDescription
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.start import async_at_started
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
@@ -24,6 +29,9 @@ from .const import (
     DOMAIN,
 )
 from .coordinator import PremierInnCoordinator
+
+_LOGGER = logging.getLogger(__name__)
+_CALENDAR_EXPORT_LOCK = f"{DOMAIN}_calendar_export_lock"
 
 DATE_SENSOR_TYPES = [
     SensorEntityDescription(
@@ -38,7 +46,7 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up sensors from a config entry created in the integrations UI."""
+    """Set up the booking calendar and export events to selected calendars."""
     config = hass.data[DOMAIN][entry.entry_id]
     # Update our config to include new repos and remove those that have been removed.
     if entry.options:
@@ -53,36 +61,40 @@ async def async_setup_entry(
 
     calendars = entry.data[CONF_CALENDARS]
 
-    sensors = [PremierInnCalendarSensor(coordinator, name)]
-
-    for calendar in calendars:
-        if calendar != "None":
-            for sensor in sensors:
-                events = sensor.get_events(datetime.today(), hass)
-                for event in events:
-                    await add_to_calendar(hass, calendar, event, entry)
+    booking_calendar = PremierInnCalendarSensor(coordinator, name)
 
     if "None" in calendars:
-        async_add_entities(sensors, update_before_add=True)
+        async_add_entities([booking_calendar], update_before_add=True)
+
+    external_calendars = [calendar for calendar in calendars if calendar != "None"]
+    if not external_calendars:
+        return
+
+    @callback
+    def async_start_calendar_export(hass: HomeAssistant) -> None:
+        entry.async_create_background_task(
+            hass,
+            async_export_events(hass, external_calendars, booking_calendar, entry),
+            f"{DOMAIN} calendar export",
+        )
+
+    entry.async_on_unload(async_at_started(hass, async_start_calendar_export))
 
 
-async def create_event(hass: HomeAssistant, service_data):
-    """Create calendar event."""
-    try:
-        await hass.services.async_call(
-            "calendar",
-            "create_event",
-            service_data,
-            blocking=True,
-            return_response=True,
-        )
-    except (ServiceValidationError, HomeAssistantError):
-        await hass.services.async_call(
-            "calendar",
-            "create_event",
-            service_data,
-            blocking=True,
-        )
+async def async_export_events(
+    hass: HomeAssistant,
+    calendars: list[str],
+    booking_calendar: PremierInnCalendarSensor,
+    entry: ConfigEntry,
+) -> None:
+    """Export upcoming booking events to each configured calendar."""
+    events = booking_calendar.get_events(dt_util.now(), hass)
+    # Older config flows could create multiple entries for the same booking.
+    lock = hass.data.setdefault(_CALENDAR_EXPORT_LOCK, asyncio.Lock())
+    for calendar in calendars:
+        for event in events:
+            async with lock:
+                await add_to_calendar(hass, calendar, event, entry)
 
 
 class DateTimeEncoder(json.JSONEncoder):
@@ -105,69 +117,76 @@ def generate_uuid_from_json(json_obj):
     return str(uuid.UUID(bytes=sha1_hash[:16]))
 
 
-async def get_event_uid(hass: HomeAssistant, service_data) -> str | None:
-    """Fetch the created event by matching with details in service_data."""
-    entity_id = service_data.get("entity_id")
-    start_time = service_data.get("start_date_time")
-    end_time = service_data.get("end_date_time")
+def calendar_event_matches(
+    event_data: dict[str, str], description: str, start: datetime, end: datetime
+) -> bool:
+    """Compare the booking marker and event times from a calendar response."""
+    if str(event_data.get("description", "")).strip().casefold() != description:
+        return False
 
-    try:
-        events = await hass.services.async_call(
-            "calendar",
-            "get_events",
-            {
-                "entity_id": entity_id,
-                "start_date_time": start_time,
-                "end_date_time": end_time,
-            },
-            return_response=True,
-            blocking=True,
-        )
-    except (ServiceValidationError, HomeAssistantError):
-        events = None
-
-    if events is not None and entity_id in events:
-        for event in events[entity_id].get("events"):
-            if (
-                event["summary"] == service_data["summary"]
-                and f"{event["description"]}" == f"{service_data["description"]}"
-                and f"{event["location"]}" == f"{service_data["location"]}"
-            ):
-                return generate_uuid_from_json(service_data)
-
-    return None
+    return (
+        datetime.fromisoformat(event_data["start"]) == start
+        and datetime.fromisoformat(event_data["end"]) == end
+    )
 
 
 async def add_to_calendar(
     hass: HomeAssistant, calendar: str, event: CalendarEvent, entry: ConfigEntry
-):
-    """Add an event to the calendar."""
+) -> None:
+    """Add a booking event only when it is absent from the calendar."""
+    if not isinstance(event.start, datetime) or not isinstance(event.end, datetime):
+        return
 
-    service_data = {
+    search_data = {
         "entity_id": calendar,
         "start_date_time": event.start,
         "end_date_time": event.end,
+    }
+    service_data = {
+        **search_data,
         "summary": event.summary,
         "description": f"{event.description}",
         "location": f"{event.location}",
     }
+    description = service_data["description"].strip().casefold()
+    start = event.start.astimezone(UTC)
+    end = event.end.astimezone(UTC)
+    uid = generate_uuid_from_json(
+        {"calendar": calendar, "description": description, "start": start, "end": end}
+    )
+    # Earlier versions hashed the full create_event payload.
+    legacy_uid = generate_uuid_from_json(service_data)
+    for booking in hass.config_entries.async_entries(DOMAIN):
+        uids = booking.data.get("uids", [])
+        if uid in uids or legacy_uid in uids:
+            return
 
-    uid = await get_event_uid(hass, service_data)
+    try:
+        response = await hass.services.async_call(
+            "calendar", "get_events", search_data, blocking=True, return_response=True
+        )
+        calendar_data = response.get(calendar) if response is not None else None
+        events = calendar_data.get("events") if isinstance(calendar_data, dict) else None
+        if not isinstance(events, list):
+            _LOGGER.warning("Could not read events from %s", calendar)
+            return
 
-    uids = entry.data.get("uids", [])
+        if not any(
+            calendar_event_matches(event_data, description, start, end)
+            for event_data in events
+        ):
+            await hass.services.async_call(
+                "calendar", "create_event", service_data, blocking=True
+            )
+    except (HomeAssistantError, KeyError, TypeError, ValueError) as err:
+        _LOGGER.warning(
+            "Could not export the Premier Inn booking to %s (%s)", calendar, err
+        )
+        return
 
-    if uid not in uids:
-        await create_event(hass, service_data)
-
-        created_event_uid = await get_event_uid(hass, service_data)
-
-        if created_event_uid is not None and created_event_uid not in uids:
-            uids.append(created_event_uid)
-
-    if uids != entry.data.get("uids", []):
-        updated_data = entry.data.copy()
-        updated_data["uids"] = uids
-        hass.config_entries.async_update_entry(entry, data=updated_data)
+    hass.config_entries.async_update_entry(
+        entry, data={**entry.data, "uids": [*entry.data.get("uids", []), uid]}
+    )
 
 
 class PremierInnCalendarSensor(
